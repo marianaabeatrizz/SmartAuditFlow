@@ -123,8 +123,11 @@ class ValidatorAgent(Agent):
             if still_independent:
                 return still_independent[: self.panel_size]
 
+        # Seed on the finding's stable id so the spread across equally
+        # independent judges is reproducible run to run.
         judges = select_judges(
-            proposer, pool, self.panel_size, strict=self.strict_independence
+            proposer, pool, self.panel_size, strict=self.strict_independence,
+            seed=str(finding.get("uid") or finding.get("Issue") or ""),
         )
         if judges and independence_of(proposer, judges[0]) == INDEPENDENCE_SELF:
             if not self._warned_self:

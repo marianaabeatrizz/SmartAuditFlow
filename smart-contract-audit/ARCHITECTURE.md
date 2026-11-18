@@ -187,6 +187,69 @@ revised claim legitimately changes its title and location, and content-derived
 identity made it look like a brand-new finding — which duplicated it and lost
 the original's verdict.
 
+## The provider layer
+
+A provider is configuration, not code. Anything with an OpenAI-compatible
+endpoint becomes available by adding a key to `.env`; `check_providers.py`
+reports what is configured, whether independent judging is possible at all,
+and (with `--probe`) whether each key really answers. It exits non-zero when
+no two configured providers come from different families, because a run in
+that state cannot produce an independently judged number.
+
+Each provider declares a `family`. That field, not the model id, is what
+`independence_of()` uses, and keeping it honest matters: NVIDIA also serves
+Gemma and Mistral, so judging with those would report `family=nvidia` while
+the model's lineage was Google's or Mistral's. The registry therefore
+defaults NVIDIA to a Nemotron, which is NVIDIA's own.
+
+### Rate limits are measured, not trusted
+
+Published limits were wrong twice here, and both times the run looked like a
+result rather than an outage:
+
+- Gemini's 500 requests/day was missing from the registry entirely. A
+  143-contract run burned through it and reported every contract as
+  independently judged while two thirds of its judge calls had failed.
+- NVIDIA's "40/min", taken from a third-party list, produced 1,680
+  rejections under sustained load — though 20 concurrent calls and ~77/min
+  in short bursts both pass. The real constraint is sustained volume, which
+  no `rpm` number expresses.
+
+So `RateLimiter` measures. Every rate rejection halves the provider's
+effective rate; 25 consecutive successes walk it back up by 25%, never past
+what was configured. That is AIMD, the same principle TCP uses on a link of
+unknown capacity. The floor of 2/min keeps a throttled run moving instead of
+deadlocking.
+
+The limiter also counts **tokens**, not just requests. Groq's binding limit
+is 8k/min and 200k/day; a run can sit comfortably inside 30 req/min and still
+exhaust the daily token budget, which is exactly what happened.
+
+### Three kinds of 429
+
+They look alike and must be handled differently. Conflating them cost most of
+48 agent-hours in one run:
+
+| meaning | example | response |
+|---|---|---|
+| slow down | `tokens per minute (TPM): Limit 8000` | throttle, back off, retry |
+| daily allowance gone | `free_tier_requests, limit: 500 ... retry in 12h37m` | fail immediately |
+| billing cap | `organization_spend_limit_exceeded` | fail immediately |
+
+Only the first clears within a run. Backing off from the other two burns
+wall-clock to fail anyway. A dropped TCP connection, by contrast, *is*
+retryable and was not treated as such at first — each drop silently discarded
+a finding, which reads as the model finding nothing rather than as an error.
+
+### Cache
+
+Responses are cached on disk, keyed on provider, model, system prompt, user
+prompt, temperature and max_tokens — everything that changes the answer, so a
+changed prompt is a miss rather than a stale hit. Debugging does not burn a
+daily quota, and re-running after a fix only pays for what actually changed.
+The cache is gitignored; it reaches tens of megabytes and holds contract
+source inside prompts.
+
 ## Model routing
 
 Each role resolves its model independently, with no shared mutable state:
@@ -228,19 +291,120 @@ curl -X POST localhost:5000/api/audit/start \
 
 # Convene a 3-judge panel from different providers
 .venv/Scripts/python.exe -m benchmark.run --limit 20 --model openai --panel-size 3
+
+# What is configured, and does each key actually answer?
+.venv/Scripts/python.exe check_providers.py --probe
+
+# The two ablation arms. --judge pins the judge pool, which is needed when
+# the automatically preferred provider has no quota left. Judging is capped
+# to the 8 most confident findings: only the head of the ranking can move
+# Top-1/Top-5/MRR, so a verdict on the 18th finding cannot change a metric,
+# and the saved calls are what keeps an independent judge affordable.
+.venv/Scripts/python.exe -m benchmark.run --model openai --judge nvidia \
+    --judge-top-n 8 --max-refine-rounds 1   # arm A: refinement loop on
+.venv/Scripts/python.exe -m benchmark.run --model openai --judge nvidia \
+    --judge-top-n 8 --max-refine-rounds 0   # arm B: ablation
 ```
+
+Findings deferred by `--judge-top-n` are flagged `judge_deferred` and keep
+the proposer's confidence. That is deliberately distinct from `unjudged`,
+which means every judge call failed and marks the whole run `[INVALID]`.
+Collapsing the two would let an outage pass for a budget decision — the
+failure mode this harness exists to prevent.
 
 Use `run_server.py`, not `src/main.py`, when verifying behaviour. `main.py`
 runs with `debug=True`, and the werkzeug reloader has left orphaned processes
 bound to port 5000 on this machine -- requests then get answered by a stale
 server running old code, which is extremely confusing to debug.
 
+## The matching rule, and a correction to it
+
+`match_ground_truth` decides where the true vulnerability sits in a report.
+Its original implementation contradicted its own docstring: the text promised
+"the rank of the **first** finding that describes the true vulnerability",
+while the code took the candidate with the highest token overlap against the
+reference text.
+
+For a ranking metric the docstring was right. An auditor reading a report
+top-down finds the issue at the first entry that describes it, whatever later
+entries happen to be phrased more like the reference. The old rule
+effectively **charged a report for describing the same issue twice** — it
+scored the second copy and ignored the first — which penalises exactly the
+high-recall behaviour this architecture produces.
+
+The fix takes the earliest candidate. It is applied identically to both
+sides, and **both sides gained**:
+
+| on the same 72 contracts | Top-1 | Top-5 | Top-max | MRR |
+|---|---|---|---|---|
+| baseline, old rule | 0.726 | 0.973 | 0.973 | 0.829 |
+| baseline, corrected | 0.792 | 0.972 | 0.972 | 0.870 |
+| multi-agent, old rule | 0.329 | 0.808 | 0.973 | 0.523 |
+| multi-agent, corrected | 0.639 | 0.917 | **0.986** | 0.756 |
+
+That both improved is what makes the correction reportable: had only the new
+architecture gained, the change would be indistinguishable from fitting the
+metric to the result.
+
+Note what the corrected numbers say. **Top-max is the one column the
+multi-agent architecture wins** — it locates the labelled vulnerability more
+often than the baseline. It still loses Top-1, and the reason is structural:
+it reports a median of 14 findings per contract against the baseline's few,
+on a benchmark that labels **one** vulnerability per contract. Other genuine
+High-severity findings ranked above the labelled one are scored as failures.
+That is a property of the evaluation protocol, not of the audit, and it is
+worth stating plainly in any write-up.
+
+### A second correction, larger than the first
+
+The table above is computed on 72 contracts because that was all the
+comparison could see. 42 of 143 baseline rows were being discarded as
+unparseable, and that filter was **not** neutral: see `parse_findings`. The
+cells are well-formed Python reprs that merely contain U+2028 LINE SEPARATOR
+between elements, which `ast.literal_eval` rejects as non-printable source.
+
+The baseline scores Top-1 0.822 on the 101 cells that always parsed and 0.268
+on the 41 that did not, so discarding them deleted almost all of its failures:
+
+| baseline, re-scored | n | Top-1 | Top-5 | Top-max | MRR |
+|---|---|---|---|---|---|
+| cells that always parsed | 101 | 0.822 | 0.970 | 0.970 | 0.885 |
+| cells recovered by the fix | 41 | 0.268 | 0.634 | 0.659 | 0.415 |
+| **all of them** | **142** | **0.662** | 0.873 | 0.880 | 0.749 |
+
+Recovering them also **validates the matching rule**: 0.662 against the 0.664
+the paper publishes from its own labels is agreement to 0.002, on a rule
+written here without reference to those labels. The rule is stricter further
+down the list — the paper reports Top-max 1.000 where this rule gives 0.880 —
+but it is applied identically to both sides.
+
+With the full dataset in scope, the standing comparison is:
+
+| on the same 134 contracts | Top-1 | Top-5 | Top-max | MRR |
+|---|---|---|---|---|
+| baseline (paper, GPT) | 0.672 | **0.873** | 0.873 | **0.755** |
+| multi-agent, loop off | **0.679** | 0.813 | **0.933** | 0.743 |
+| multi-agent, loop on | 0.664 | 0.813 | **0.933** | 0.733 |
+
+The architecture locates the labelled vulnerability in 125 of 134 contracts
+against the baseline's 117 — 11 it finds that the baseline misses entirely,
+against 3 the other way — and is level on Top-1. It loses Top-5 and MRR
+because its extra detections land outside the top five. The baseline's Top-5
+equals its Top-max exactly: when it finds the issue at all, it is always
+already in the top five, because it reports so few findings.
+
+Ranking weights were deliberately **not** tuned. Nine variants were measured
+offline and all land between Top-1 0.257 and 0.310; picking the best of them
+would be fitting the test set, and no such choice is in the shipped code.
+
 ## Measurement caveat
 
 The published `Rank` column **cannot be reproduced** from the artifact:
 matching the ground-truth `Issue` against the stored `Findings` reproduces
-only ~61% of published ranks, and the disagreements are systematic. A further
-42 of 145 rows have an unparseable `Findings` cell.
+only ~61% of published ranks, and the disagreements are systematic. One of
+143 rows still has an unreadable `Findings` cell (a stray U+2018); the other
+41 that used to be unreadable are recovered — see `parse_findings`, and the
+section above for why that mattered more than anything else measured here.
 
 So the new numbers must not be compared against the published numbers
 directly. `benchmark/run.py` instead re-scores the stored baseline findings

@@ -234,6 +234,33 @@ def test_unjudged_findings_are_surfaced_to_the_caller():
     print(f"  {result['UnjudgedCount']} finding(s) flagged unjudged")
 
 
+def test_work_is_spread_across_equally_independent_judges():
+    """One judge per finding plus three free providers must not mean one
+    provider doing everything: that drove the run to 20 min/contract while
+    two providers sat idle."""
+    pool = ["claude", "gemini", "deepseek"]
+    picked = {select_judges("openai", pool, 1, seed=f"uid-{i}")[0]
+              for i in range(40)}
+    assert len(picked) > 1, f"all 40 findings went to one judge: {picked}"
+
+
+def test_the_spread_is_reproducible():
+    """Keyed on the finding, not on a counter: a benchmark whose judge
+    allocation shifts with thread scheduling is not reproducible."""
+    pool = ["claude", "gemini", "deepseek"]
+    first = [select_judges("openai", pool, 1, seed=f"uid-{i}")[0] for i in range(20)]
+    second = [select_judges("openai", pool, 1, seed=f"uid-{i}")[0] for i in range(20)]
+    assert first == second
+
+
+def test_spreading_never_picks_a_less_independent_judge():
+    """Load balancing must not trade away independence."""
+    pool = ["gpt-4.1", "claude", "gemini"]          # gpt-4.1 is same family
+    for i in range(30):
+        chosen = select_judges("openai", pool, 1, seed=f"uid-{i}")[0]
+        assert independence_of("openai", chosen) == INDEPENDENCE_CROSS_PROVIDER
+
+
 def test_judging_is_capped_to_the_most_confident_candidates():
     """Only the head of the ranking can move Top-1/Top-5/MRR, so judging the
     tail buys nothing and costs the quota that pays for independence."""

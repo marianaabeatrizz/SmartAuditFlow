@@ -138,8 +138,19 @@ def select_judges(
     candidates: List[str],
     panel_size: int = 1,
     strict: bool = False,
+    seed: str = "",
 ) -> List[str]:
     """Pick judges for a finding proposed by ``proposer``, most independent first.
+
+    ``seed`` spreads the work across equally independent judges. With one
+    judge per finding and three free providers configured, always choosing
+    the first one drives that provider into its rate limit while the other
+    two sit idle -- which is what reduced a run to 20 minutes per contract.
+
+    The spread is keyed on the finding's identity rather than a rotating
+    counter, so the same finding goes to the same judge on every run. A
+    counter would make the assignment depend on thread scheduling, and a
+    benchmark whose judge allocation changes between runs is not reproducible.
 
     Preference: cross-provider, then cross-model, then -- only if nothing else
     exists -- the proposer itself. Strict mode raises instead, because a
@@ -157,6 +168,11 @@ def select_judges(
         m for m in candidates
         if independence_of(proposer, m) == INDEPENDENCE_CROSS_MODEL
     ]
+
+    if seed and len(cross_provider) > 1:
+        offset = int(hashlib.sha256(seed.encode()).hexdigest()[:8], 16)
+        offset %= len(cross_provider)
+        cross_provider = cross_provider[offset:] + cross_provider[:offset]
 
     chosen: List[str] = []
     seen_families: set = set()

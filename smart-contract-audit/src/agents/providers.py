@@ -77,7 +77,12 @@ KNOWN_PROVIDERS: Dict[str, Dict[str, object]] = {
         "tpm": 8000,
         "tpd": 200000,
         "note": "free; 8k tokens/min and 200k/day are the binding limits, "
-                "not the request count; no logprobs, n must be 1",
+                "not the request count; no logprobs, n must be 1. "
+                "UNUSABLE AS A JUDGE at benchmark scale: a judge call costs "
+                "~1,750 tokens, so the daily budget allows ~114 of the ~1,150 "
+                "a 143-contract arm needs. Including it in a judge rotation "
+                "sent a third of the findings to a provider that could not "
+                "answer, and 99 of 143 contracts came back unjudged.",
     },
     "openrouter": {
         "key_env": "OPENROUTER_API_KEY",

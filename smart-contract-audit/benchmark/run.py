@@ -81,14 +81,34 @@ def load_dataset(path: Optional[str] = None) -> List[Dict[str, Any]]:
 def parse_findings(raw: str) -> Optional[List[Dict]]:
     """Parse the baseline's stored findings cell.
 
-    It is a Python repr, not JSON, and 42/145 cells are malformed. An
-    unparseable cell is returned as None and excluded from the comparison
-    rather than silently counted as 'found nothing', which would flatter the
-    new architecture.
+    It is a Python repr, not JSON. 42/143 cells used to be dropped as
+    unparseable, and that was not a property of the data: 41 of them are
+    complete, well-formed reprs that merely contain U+2028 LINE SEPARATOR,
+    which ``ast.literal_eval`` rejects as a non-printable character in
+    source. One more carries a U+2018 smart quote and is still dropped.
+
+    Dropping them was not a neutral filter, it was the single largest error
+    in this benchmark. The baseline scores Top-1 0.822 on the 101 cells that
+    always parsed and 0.268 on the 41 that did not, so excluding them removed
+    almost all of its failures and reported it at 0.822 instead of 0.662.
+    Recovering them also validates the matching rule itself: re-scoring all
+    142 gives Top-1 0.662 against the 0.664 the paper publishes from its own
+    labels, which is agreement to 0.002 on a rule written independently.
+
+    A cell that still cannot be read is returned as None and excluded, rather
+    than silently counted as 'found nothing', which would flatter the new
+    architecture.
     """
     raw = (raw or "").strip()
     if not raw:
         return None
+    # U+2028/U+2029 are legal in a str at runtime but not in source text handed
+    # to a parser. In these cells they sit *between* elements of the repr, not
+    # inside the quotes, so substituting an escape ("\\n") turns them into a
+    # line-continuation backslash and the parse fails a second way. A space is
+    # valid in both positions: whitespace between tokens, or a space inside a
+    # string, which the text-overlap matcher does not care about either way.
+    raw = raw.replace(" ", " ").replace(" ", " ")
     for loader in (ast.literal_eval, json.loads):
         try:
             obj = loader(raw)

@@ -1,0 +1,125 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<mxfile host="Claude" modified="2026-11-18T03:40:23.000Z" agent="drawio_builder.py" version="24.7.17" type="device">
+  <diagram id="47ad72cf-376e-4414-a1e8-b5b4d4f722a2" name="SmartAuditFlow multiagente">
+    <mxGraphModel dx="1200" dy="800" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1132" pageHeight="1282" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="gr_sp" value="Especialistas (paralelo)" style="rounded=1;whiteSpace=wrap;html=1;arcSize=6;fillColor=#DCEBE9;strokeColor=#0E6E6E;strokeWidth=2.4;fontColor=#0E6E6E;verticalAlign=top;align=center;fontSize=11;fontStyle=1;spacingTop=4;container=0;" vertex="1" parent="1">
+          <mxGeometry x="466" y="580" width="200" height="430" as="geometry" />
+        </mxCell>
+        <mxCell id="t_orig" value="&lt;b&gt;ARQUITETURA ORIGINAL (artigo)&lt;/b&gt;" style="rounded=1;whiteSpace=wrap;html=1;arcSize=8;fillColor=#FFFFFF;strokeColor=#C3CBCA;fontColor=#8A9495;strokeWidth=1.2;verticalAlign=middle;align=center;fontSize=13;spacing=6;" vertex="1" parent="1">
+          <mxGeometry x="40" y="40" width="1052" height="36" as="geometry" />
+        </mxCell>
+        <mxCell id="o_in" value="&lt;b&gt;Contrato&lt;/b&gt;&lt;br&gt;&lt;span style=&quot;font-size:11px;&quot;&gt;codigo-fonte&lt;/span&gt;" style="rounded=1;whiteSpace=wrap;html=1;arcSize=8;fillColor=#FFFFFF;strokeColor=#C3CBCA;fontColor=#8A9495;strokeWidth=1.2;verticalAlign=middle;align=center;fontSize=13;spacing=6;" vertex="1" parent="1">
+          <mxGeometry x="40" y="154" width="172" height="74" as="geometry" />
+        </mxCell>
+        <mxCell id="o_plan" value="&lt;b&gt;Planejamento&lt;/b&gt;&lt;br&gt;&lt;span style=&quot;font-size:11px;&quot;&gt;plano de auditoria&lt;/span&gt;" style="rounded=1;whiteSpace=wrap;html=1;arcSize=8;fillColor=#FFFFFF;strokeColor=#C3CBCA;fontColor=#8A9495;strokeWidth=1.2;verticalAlign=middle;align=center;fontSize=13;spacing=6;" vertex="1" parent="1">
+          <mxGeometry x="260" y="154" width="172" height="74" as="geometry" />
+        </mxCell>
+        <mxCell id="o_exec" value="&lt;b&gt;Execucao&lt;/b&gt;&lt;br&gt;&lt;span style=&quot;font-size:11px;&quot;&gt;um LLM, sequencial&lt;/span&gt;" style="rounded=1;whiteSpace=wrap;html=1;arcSize=8;fillColor=#FFFFFF;strokeColor=#C3CBCA;fontColor=#8A9495;strokeWidth=1.2;verticalAlign=middle;align=center;fontSize=13;spacing=6;" vertex="1" parent="1">
+          <mxGeometry x="480" y="154" width="172" height="74" as="geometry" />
+        </mxCell>
+        <mxCell id="o_cal" value="&lt;b&gt;Calibracao&lt;/b&gt;&lt;br&gt;&lt;span style=&quot;font-size:11px;&quot;&gt;MESMO modelo se avalia&lt;/span&gt;" style="rounded=1;whiteSpace=wrap;html=1;arcSize=8;fillColor=#F7E6E3;strokeColor=#9B2C22;fontColor=#9B2C22;strokeWidth=1.4;verticalAlign=middle;align=center;fontSize=13;spacing=6;" vertex="1" parent="1">
+          <mxGeometry x="700" y="154" width="172" height="74" as="geometry" />
+        </mxCell>
+        <mxCell id="o_out" value="&lt;b&gt;Relatorio&lt;/b&gt;&lt;br&gt;&lt;span style=&quot;font-size:11px;&quot;&gt;achados ordenados&lt;/span&gt;" style="rounded=1;whiteSpace=wrap;html=1;arcSize=8;fillColor=#FFFFFF;strokeColor=#C3CBCA;fontColor=#8A9495;strokeWidth=1.2;verticalAlign=middle;align=center;fontSize=13;spacing=6;" vertex="1" parent="1">
+          <mxGeometry x="920" y="154" width="172" height="74" as="geometry" />
+        </mxCell>
+        <mxCell id="bias" value="&lt;b&gt;vies de auto-preferencia&lt;/b&gt;&lt;br&gt;&lt;span style=&quot;font-size:11px;&quot;&gt;infla a confianca que sustenta todo o ranking&lt;/span&gt;" style="rounded=1;whiteSpace=wrap;html=1;arcSize=8;fillColor=#F7E6E3;strokeColor=#9B2C22;fontColor=#9B2C22;strokeWidth=1.4;verticalAlign=middle;align=center;fontSize=13;spacing=6;" vertex="1" parent="1">
+          <mxGeometry x="700" y="268" width="392" height="56" as="geometry" />
+        </mxCell>
+        <mxCell id="t_nova" value="&lt;b&gt;ARQUITETURA PROPOSTA&lt;/b&gt;" style="rounded=1;whiteSpace=wrap;html=1;arcSize=8;fillColor=#DCEBE9;strokeColor=#0E6E6E;fontColor=#0E6E6E;strokeWidth=2.4;verticalAlign=middle;align=center;fontSize=13;spacing=6;" vertex="1" parent="1">
+          <mxGeometry x="40" y="496" width="1052" height="36" as="geometry" />
+        </mxCell>
+        <mxCell id="n_in" value="&lt;b&gt;Contrato&lt;/b&gt;&lt;br&gt;&lt;span style=&quot;font-size:11px;&quot;&gt;codigo-fonte&lt;/span&gt;" style="rounded=1;whiteSpace=wrap;html=1;arcSize=8;fillColor=#FFFFFF;strokeColor=#4C5758;fontColor=#14191A;strokeWidth=1.4;verticalAlign=middle;align=center;fontSize=13;spacing=6;" vertex="1" parent="1">
+          <mxGeometry x="40" y="610" width="172" height="74" as="geometry" />
+        </mxCell>
+        <mxCell id="n_ctx" value="&lt;b&gt;Contexto&lt;/b&gt;&lt;br&gt;&lt;span style=&quot;font-size:11px;&quot;&gt;resumo do contrato&lt;/span&gt;" style="rounded=1;whiteSpace=wrap;html=1;arcSize=8;fillColor=#FFFFFF;strokeColor=#4C5758;fontColor=#14191A;strokeWidth=1.4;verticalAlign=middle;align=center;fontSize=13;spacing=6;" vertex="1" parent="1">
+          <mxGeometry x="40" y="724" width="172" height="74" as="geometry" />
+        </mxCell>
+        <mxCell id="n_plan" value="&lt;b&gt;Orquestrador&lt;/b&gt;&lt;br&gt;&lt;span style=&quot;font-size:11px;&quot;&gt;escolhe especialistas&lt;/span&gt;" style="rounded=1;whiteSpace=wrap;html=1;arcSize=8;fillColor=#DCEBE9;strokeColor=#0E6E6E;fontColor=#0E6E6E;strokeWidth=2.4;verticalAlign=middle;align=center;fontSize=13;spacing=6;" vertex="1" parent="1">
+          <mxGeometry x="260" y="724" width="172" height="74" as="geometry" />
+        </mxCell>
+        <mxCell id="sp1" value="&lt;b&gt;reentrancy&lt;/b&gt;" style="rounded=1;whiteSpace=wrap;html=1;arcSize=8;fillColor=#FFFFFF;strokeColor=#4C5758;fontColor=#14191A;strokeWidth=1.4;verticalAlign=middle;align=center;fontSize=13;spacing=6;" vertex="1" parent="1">
+          <mxGeometry x="480" y="610" width="172" height="44" as="geometry" />
+        </mxCell>
+        <mxCell id="sp2" value="&lt;b&gt;access control&lt;/b&gt;" style="rounded=1;whiteSpace=wrap;html=1;arcSize=8;fillColor=#FFFFFF;strokeColor=#4C5758;fontColor=#14191A;strokeWidth=1.4;verticalAlign=middle;align=center;fontSize=13;spacing=6;" vertex="1" parent="1">
+          <mxGeometry x="480" y="724" width="172" height="44" as="geometry" />
+        </mxCell>
+        <mxCell id="sp3" value="&lt;b&gt;arithmetic&lt;/b&gt;" style="rounded=1;whiteSpace=wrap;html=1;arcSize=8;fillColor=#FFFFFF;strokeColor=#4C5758;fontColor=#14191A;strokeWidth=1.4;verticalAlign=middle;align=center;fontSize=13;spacing=6;" vertex="1" parent="1">
+          <mxGeometry x="480" y="838" width="172" height="44" as="geometry" />
+        </mxCell>
+        <mxCell id="sp4" value="&lt;b&gt;+ 9 especialistas&lt;/b&gt;&lt;br&gt;&lt;span style=&quot;font-size:11px;&quot;&gt;DASP-10, em paralelo&lt;/span&gt;" style="rounded=1;whiteSpace=wrap;html=1;arcSize=8;fillColor=#FFFFFF;strokeColor=#C3CBCA;fontColor=#8A9495;strokeWidth=1.2;verticalAlign=middle;align=center;fontSize=13;spacing=6;" vertex="1" parent="1">
+          <mxGeometry x="480" y="952" width="172" height="44" as="geometry" />
+        </mxCell>
+        <mxCell id="n_val" value="&lt;b&gt;VALIDADOR&lt;/b&gt;&lt;br&gt;&lt;span style=&quot;font-size:11px;&quot;&gt;juiz de OUTRA familia&lt;/span&gt;" style="rounded=1;whiteSpace=wrap;html=1;arcSize=8;fillColor=#DFEDE5;strokeColor=#1C6B45;fontColor=#1C6B45;strokeWidth=1.8;verticalAlign=middle;align=center;fontSize=13;spacing=6;" vertex="1" parent="1">
+          <mxGeometry x="700" y="724" width="172" height="74" as="geometry" />
+        </mxCell>
+        <mxCell id="n_ref" value="&lt;b&gt;Refinamento&lt;/b&gt;&lt;br&gt;&lt;span style=&quot;font-size:11px;&quot;&gt;volta ao especialista&lt;/span&gt;" style="rounded=1;whiteSpace=wrap;html=1;arcSize=50;fillColor=#DCEBE9;strokeColor=#0E6E6E;fontColor=#0E6E6E;strokeWidth=1.6;verticalAlign=middle;align=center;fontSize=10;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="700" y="952" width="172" height="74" as="geometry" />
+        </mxCell>
+        <mxCell id="n_agg" value="&lt;b&gt;Agregador&lt;/b&gt;&lt;br&gt;&lt;span style=&quot;font-size:11px;&quot;&gt;funde e ordena&lt;/span&gt;" style="rounded=1;whiteSpace=wrap;html=1;arcSize=8;fillColor=#FFFFFF;strokeColor=#4C5758;fontColor=#14191A;strokeWidth=1.4;verticalAlign=middle;align=center;fontSize=13;spacing=6;" vertex="1" parent="1">
+          <mxGeometry x="920" y="724" width="172" height="74" as="geometry" />
+        </mxCell>
+        <mxCell id="n_out" value="&lt;b&gt;Relatorio&lt;/b&gt;&lt;br&gt;&lt;span style=&quot;font-size:11px;&quot;&gt;achados + independencia&lt;/span&gt;" style="rounded=1;whiteSpace=wrap;html=1;arcSize=8;fillColor=#FFFFFF;strokeColor=#4C5758;fontColor=#14191A;strokeWidth=1.4;verticalAlign=middle;align=center;fontSize=13;spacing=6;" vertex="1" parent="1">
+          <mxGeometry x="920" y="838" width="172" height="74" as="geometry" />
+        </mxCell>
+        <mxCell id="g1" value="&lt;b&gt;1. juiz independente&lt;/b&gt;&lt;br&gt;&lt;span style=&quot;font-size:11px;&quot;&gt;nenhum modelo julga a si mesmo;\nnivel registrado por achado&lt;/span&gt;" style="rounded=1;whiteSpace=wrap;html=1;arcSize=8;fillColor=#DFEDE5;strokeColor=#1C6B45;fontColor=#1C6B45;strokeWidth=1.8;verticalAlign=middle;align=center;fontSize=13;spacing=6;" vertex="1" parent="1">
+          <mxGeometry x="40" y="1180" width="392" height="62" as="geometry" />
+        </mxCell>
+        <mxCell id="g2" value="&lt;b&gt;2. laco de verificacao&lt;/b&gt;&lt;br&gt;&lt;span style=&quot;font-size:11px;&quot;&gt;reprovou -&amp;gt; volta a execucao -&amp;gt; verifica de novo\n(limite de rodadas, evidencia nova, mesmo juiz)&lt;/span&gt;" style="rounded=1;whiteSpace=wrap;html=1;arcSize=50;fillColor=#DCEBE9;strokeColor=#0E6E6E;fontColor=#0E6E6E;strokeWidth=1.6;verticalAlign=middle;align=center;fontSize=10;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="480" y="1180" width="392" height="62" as="geometry" />
+        </mxCell>
+        <mxCell id="g3" value="&lt;b&gt;3. especialistas paralelos&lt;/b&gt;&lt;br&gt;&lt;span style=&quot;font-size:11px;&quot;&gt;12 checklists disjuntas\nem vez de um passe sequencial&lt;/span&gt;" style="rounded=1;whiteSpace=wrap;html=1;arcSize=8;fillColor=#DCEBE9;strokeColor=#0E6E6E;fontColor=#0E6E6E;strokeWidth=2.4;verticalAlign=middle;align=center;fontSize=13;spacing=6;" vertex="1" parent="1">
+          <mxGeometry x="920" y="1180" width="172" height="62" as="geometry" />
+        </mxCell>
+        <mxCell id="lbl0" value="O julgamento acontece FORA da familia de modelos que propos o achado." style="text;html=1;align=left;verticalAlign=middle;fontColor=#0E6E6E;fontSize=11;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="40" y="1066" width="172" height="20" as="geometry" />
+        </mxCell>
+        <mxCell id="lbl1" value="O que muda:" style="text;html=1;align=left;verticalAlign=middle;fontColor=#0E6E6E;fontSize=11;fontStyle=1;letterSpacing=1;" vertex="1" parent="1">
+          <mxGeometry x="40" y="1100" width="172" height="20" as="geometry" />
+        </mxCell>
+        <mxCell id="e0" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;jettySize=auto;strokeColor=#4C5758;strokeWidth=1.4;fontColor=#4C5758;fontSize=11;endArrow=blockThin;endFill=1;" edge="1" parent="1" source="o_in" target="o_plan">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e1" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;jettySize=auto;strokeColor=#4C5758;strokeWidth=1.4;fontColor=#4C5758;fontSize=11;endArrow=blockThin;endFill=1;" edge="1" parent="1" source="o_plan" target="o_exec">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e2" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;jettySize=auto;strokeColor=#4C5758;strokeWidth=1.4;fontColor=#4C5758;fontSize=11;endArrow=blockThin;endFill=1;" edge="1" parent="1" source="o_exec" target="o_cal">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e3" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;jettySize=auto;strokeColor=#4C5758;strokeWidth=1.4;fontColor=#4C5758;fontSize=11;endArrow=blockThin;endFill=1;" edge="1" parent="1" source="o_cal" target="o_out">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e4" value="" style="edgeStyle=none;rounded=0;html=1;dashed=1;dashPattern=6 4;strokeColor=#9B2C22;strokeWidth=1.3;fontColor=#9B2C22;fontSize=11;endArrow=blockThin;endFill=1;exitX=0.5;exitY=1.0;exitDx=0;exitDy=0;entryX=0.5;entryY=0.0;entryDx=0;entryDy=0;" edge="1" parent="1" source="o_cal" target="bias">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e5" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;jettySize=auto;strokeColor=#0E6E6E;strokeWidth=1.8;fontColor=#0E6E6E;fontSize=11;endArrow=blockThin;endFill=1;exitX=0.5;exitY=1.0;exitDx=0;exitDy=0;entryX=0.5;entryY=0.0;entryDx=0;entryDy=0;" edge="1" parent="1" source="n_in" target="n_ctx">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e6" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;jettySize=auto;strokeColor=#0E6E6E;strokeWidth=1.8;fontColor=#0E6E6E;fontSize=11;endArrow=blockThin;endFill=1;" edge="1" parent="1" source="n_ctx" target="n_plan">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e7" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;jettySize=auto;strokeColor=#0E6E6E;strokeWidth=1.8;fontColor=#0E6E6E;fontSize=11;endArrow=blockThin;endFill=1;" edge="1" parent="1" source="n_plan" target="gr_sp">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e8" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;jettySize=auto;strokeColor=#0E6E6E;strokeWidth=1.8;fontColor=#0E6E6E;fontSize=11;endArrow=blockThin;endFill=1;" edge="1" parent="1" source="gr_sp" target="n_val">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e9" value="aprovado" style="edgeStyle=none;rounded=0;html=1;strokeColor=#1C6B45;strokeWidth=1.9;fontColor=#1C6B45;fontSize=11;endArrow=blockThin;endFill=1;" edge="1" parent="1" source="n_val" target="n_agg">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e10" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;jettySize=auto;strokeColor=#0E6E6E;strokeWidth=1.8;fontColor=#0E6E6E;fontSize=11;endArrow=blockThin;endFill=1;exitX=0.5;exitY=1.0;exitDx=0;exitDy=0;entryX=0.5;entryY=0.0;entryDx=0;entryDy=0;" edge="1" parent="1" source="n_agg" target="n_out">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e11" value="reprovado" style="edgeStyle=none;rounded=0;html=1;dashed=1;dashPattern=6 4;strokeColor=#9B2C22;strokeWidth=1.3;fontColor=#9B2C22;fontSize=11;endArrow=blockThin;endFill=1;exitX=0.5;exitY=1.0;exitDx=0;exitDy=0;entryX=0.5;entryY=0.0;entryDx=0;entryDy=0;" edge="1" parent="1" source="n_val" target="n_ref">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e12" value="nova evidencia" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;dashed=1;dashPattern=6 4;strokeColor=#4C5758;strokeWidth=1.4;fontColor=#4C5758;fontSize=11;endArrow=blockThin;endFill=1;exitX=0.0;exitY=0.5;exitDx=0;exitDy=0;entryX=0.5;entryY=1.0;entryDx=0;entryDy=0;" edge="1" parent="1" source="n_ref" target="gr_sp">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>
