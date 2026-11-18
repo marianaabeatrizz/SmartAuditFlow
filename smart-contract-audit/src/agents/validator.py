@@ -37,6 +37,34 @@ logger = logging.getLogger(__name__)
 VERDICT_WEIGHT = {"confirmed": 1.0, "uncertain": 0.45, "rejected": 0.08}
 SEVERITY_BONUS = {"High": 0.10, "Medium": 0.04, "Low": 0.0}
 
+# Ordering for "is this replacement judge at least as independent as the one
+# it replaces?". Failing over must never quietly buy throughput with the one
+# property the architecture exists to establish.
+_INDEPENDENCE_RANK = {
+    INDEPENDENCE_UNJUDGED: 0,
+    INDEPENDENCE_SELF: 1,
+    INDEPENDENCE_CROSS_MODEL: 2,
+    INDEPENDENCE_CROSS_PROVIDER: 3,
+}
+
+# A judge that failed this way will fail the same way on the next call today,
+# so there is nothing to gain by asking it again. Deliberately narrower than
+# the client's retry list: a per-minute rate rejection is transient and the
+# limiter already handles it, and retiring a judge over one of those would
+# throw away good capacity over a momentary burst.
+_JUDGE_EXHAUSTED_MARKERS = (
+    "per day", "requests per day", "tokens per day", "daily quota",
+    "free_tier_requests", "resource_exhausted", "quota exceeded",
+    "insufficient_quota", "spend limit", "organization_spend_limit",
+    "credit balance", "billing details", "rpd:", "tpd:",
+)
+
+
+def _looks_exhausted(reason: str) -> bool:
+    """Did this judge run out, as opposed to merely stumble?"""
+    low = (reason or "").lower()
+    return any(marker in low for marker in _JUDGE_EXHAUSTED_MARKERS)
+
 
 def _identity(finding: Finding) -> tuple:
     """Stable key for 'is this the same candidate I already validated?'.
@@ -88,22 +116,95 @@ class ValidatorAgent(Agent):
         super().__init__(client, model)
         self.panel_size = max(1, int(panel_size))
         self.strict_independence = strict_independence
-        # 0 judges everything. A positive value judges only that many of the
-        # most confident candidates per contract -- the only ones whose
-        # verdict can move Top-1/Top-5/MRR.
+        # 0 judges everything, and that is the setting a reported number
+        # should use. A positive value judges only that many of the most
+        # confident candidates, ranked by the *proposer's own* confidence.
+        #
+        # It was introduced as a quota saving, on the reasoning that only the
+        # head of the ranking can move Top-1/Top-5/MRR. That reasoning is
+        # backwards: the verdict is what decides the rank, so a candidate the
+        # cap excludes keeps the proposer's self-assessment, defaults to
+        # `uncertain` (weight 0.45) and can never climb however good it is.
+        # The cap makes its own premise true.
+        #
+        # Measured at judge_top_n=8: 49% of the labelled vulnerabilities that
+        # ended up mis-ranked had never been judged, against 6% of those that
+        # reached rank 1. Treat this as a budget knob, and say so whenever a
+        # number produced with it is reported.
         self.judge_top_n = max(0, int(judge_top_n or 0))
         # Candidate judges: whatever was configured, else every model the
         # provider setup actually has keys for.
         self._configured_judges = judge_models
         self._warned_self = False
+        # Judges whose daily quota or billing cap is spent. Once a judge is in
+        # here it is out of the pool for the rest of the run: a run that spent
+        # 8 contracts' worth of findings calling a provider that had already
+        # said "come back in 7 hours" is how 8 contracts came back unjudged.
+        self._exhausted_judges: set = set()
 
     def judge_pool(self) -> List[str]:
         if self._configured_judges:
-            return [m for m in self._configured_judges if self.client.available(m)]
-        available = self.client.get_available_models() if hasattr(
-            self.client, "get_available_models"
-        ) else {}
-        return [m for m, ok in available.items() if ok]
+            pool = [m for m in self._configured_judges if self.client.available(m)]
+        else:
+            available = self.client.get_available_models() if hasattr(
+                self.client, "get_available_models"
+            ) else {}
+            pool = [m for m, ok in available.items() if ok]
+        # A judge whose daily quota is gone cannot answer again today, so
+        # keeping it in the pool only buys more failures. Dropping it also
+        # lets the seed-based spreading redistribute to whoever is left.
+        live = [m for m in pool if m not in self._exhausted_judges]
+        return live or pool
+
+    def _retire_judge(self, model: str, reason: str) -> None:
+        """Take a judge out of the pool for the rest of the run.
+
+        Only for failures that cannot succeed on a retry -- a daily quota or a
+        billing cap. A per-minute rate rejection is transient and is handled by
+        the client's limiter; retiring on one of those would throw away a
+        perfectly good judge over a momentary burst.
+        """
+        if model in self._exhausted_judges:
+            return
+        self._exhausted_judges.add(model)
+        logger.error(
+            "judge '%s' retired for this run: %s. Remaining judges: %s",
+            model, reason, self.judge_pool() or "NONE",
+        )
+
+    def _replacement_judge(self, finding: Finding, proposer: str,
+                           already: List[str]) -> Optional[str]:
+        """Another judge at the SAME independence level as the one that died.
+
+        Failing over to a less independent judge would quietly trade away the
+        property this whole architecture exists to establish, so a replacement
+        that is not at least as independent is refused and the finding is left
+        honestly unjudged instead.
+        """
+        wanted = independence_of(proposer, already[0]) if already else None
+        candidates = [
+            m for m in self.judge_pool()
+            if m not in already and m not in self._exhausted_judges
+        ]
+        if not candidates:
+            return None
+        picked = select_judges(
+            proposer, candidates, 1, strict=False,
+            seed=str(finding.get("uid") or finding.get("Issue") or ""),
+        )
+        if not picked:
+            return None
+        replacement = picked[0]
+        level = independence_of(proposer, replacement)
+        if level == INDEPENDENCE_SELF and self.strict_independence:
+            return None
+        if wanted and _INDEPENDENCE_RANK.get(level, 0) < _INDEPENDENCE_RANK.get(wanted, 0):
+            logger.warning(
+                "no replacement judge as independent as '%s' (%s); leaving the "
+                "finding unjudged rather than weakening the claim", already[0], wanted,
+            )
+            return None
+        return replacement
 
     def judges_for(self, finding: Finding) -> List[str]:
         proposer = finding.get("proposer_model") or self.model
@@ -268,7 +369,58 @@ Return ONLY JSON:
                 ]
                 rulings = [f.result() for f in futures]
 
+        rulings = self._failover(finding, state, rulings, proposer)
         return self._merge_rulings(finding, rulings, proposer)
+
+    def _failover(
+        self, finding: Finding, state: Dict[str, Any],
+        rulings: List[Dict[str, Any]], proposer: str,
+    ) -> List[Dict[str, Any]]:
+        """Re-ask an equally independent judge when one died of exhaustion.
+
+        Without this, a provider hitting its daily quota mid-run turns every
+        remaining finding routed to it into an unjudged one -- which is not a
+        measurement, it is an outage. The replacement must be at least as
+        independent as the judge it replaces; when none is, the finding stays
+        unjudged and is reported as such.
+        """
+        if all(r.get("ok") for r in rulings):
+            return rulings
+
+        # A revision is pinned to the judge that objected to it. Failing over
+        # here would be judge shopping wearing a seatbelt: "the reviewer who
+        # objected was unavailable, so we asked someone else" is how a claim
+        # gets accepted by the one reviewer who happens to agree. If that judge
+        # cannot answer, the revision stays unjudged.
+        if finding.get("refined") and finding.get("prior_judges"):
+            logger.info(
+                "no failover for a revision: judge %s objected and must be the "
+                "one to decide whether the objection was met",
+                finding.get("prior_judges"),
+            )
+            return rulings
+
+        tried = [r["judge"] for r in rulings]
+        out = list(rulings)
+        for i, ruling in enumerate(rulings):
+            if ruling.get("ok") or not _looks_exhausted(ruling.get("reason", "")):
+                continue
+            self._retire_judge(ruling["judge"], ruling.get("reason", "")[:120])
+            replacement = self._replacement_judge(finding, proposer, tried)
+            if not replacement:
+                continue
+            logger.info(
+                "re-judging %r with '%s' after '%s' ran out",
+                str(finding.get("Issue"))[:60], replacement, ruling["judge"],
+            )
+            retry = self._judge_once(finding, state, replacement)
+            tried.append(replacement)
+            # Keep the dead judge's record so judges_failed still reports it:
+            # the failover is visible in the output, not papered over.
+            if retry.get("ok"):
+                out[i] = retry
+                out.append(ruling)
+        return out
 
     def _merge_rulings(
         self, finding: Finding, rulings: List[Dict[str, Any]], proposer: str

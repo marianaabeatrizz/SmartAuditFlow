@@ -38,7 +38,7 @@
         <mxCell id="n_ctx" value="&lt;b&gt;Contexto&lt;/b&gt;&lt;br&gt;&lt;span style=&quot;font-size:11px;&quot;&gt;resumo do contrato&lt;/span&gt;" style="rounded=1;whiteSpace=wrap;html=1;arcSize=8;fillColor=#FFFFFF;strokeColor=#4C5758;fontColor=#14191A;strokeWidth=1.4;verticalAlign=middle;align=center;fontSize=13;spacing=6;" vertex="1" parent="1">
           <mxGeometry x="40" y="724" width="172" height="74" as="geometry" />
         </mxCell>
-        <mxCell id="n_plan" value="&lt;b&gt;Orquestrador&lt;/b&gt;&lt;br&gt;&lt;span style=&quot;font-size:11px;&quot;&gt;escolhe especialistas&lt;/span&gt;" style="rounded=1;whiteSpace=wrap;html=1;arcSize=8;fillColor=#DCEBE9;strokeColor=#0E6E6E;fontColor=#0E6E6E;strokeWidth=2.4;verticalAlign=middle;align=center;fontSize=13;spacing=6;" vertex="1" parent="1">
+        <mxCell id="n_plan" value="&lt;b&gt;Orquestrador&lt;/b&gt;&lt;br&gt;&lt;span style=&quot;font-size:11px;&quot;&gt;briefing por especialista&lt;/span&gt;" style="rounded=1;whiteSpace=wrap;html=1;arcSize=8;fillColor=#DCEBE9;strokeColor=#0E6E6E;fontColor=#0E6E6E;strokeWidth=2.4;verticalAlign=middle;align=center;fontSize=13;spacing=6;" vertex="1" parent="1">
           <mxGeometry x="260" y="724" width="172" height="74" as="geometry" />
         </mxCell>
         <mxCell id="sp1" value="&lt;b&gt;reentrancy&lt;/b&gt;" style="rounded=1;whiteSpace=wrap;html=1;arcSize=8;fillColor=#FFFFFF;strokeColor=#4C5758;fontColor=#14191A;strokeWidth=1.4;verticalAlign=middle;align=center;fontSize=13;spacing=6;" vertex="1" parent="1">

@@ -402,6 +402,108 @@ def test_same_model_corroboration_is_discounted():
     )
 
 
+class ExhaustedJudge(MultiProviderLLM):
+    """One judge has spent its daily quota; the rest still answer.
+
+    This is the real failure mode: Gemini's free tier is 500 requests/day and
+    a 143-contract arm needs more than that, so it dies partway through a run
+    while NVIDIA is still fine.
+    """
+
+    def __init__(self, dead="gemini"):
+        super().__init__(["openai", "claude", "gemini", "deepseek"])
+        self.dead = dead
+        self.calls = []
+
+    def complete(self, prompt, model, system="", timeout=90, max_tokens=4000,
+                 temperature=0.0):
+        if "adversarial reviewer" in system:
+            self.calls.append(model)
+            if model == self.dead:
+                raise RuntimeError(
+                    "429 RESOURCE_EXHAUSTED: free_tier_requests, retry in 7h"
+                )
+            return LLMResponse(
+                text=json.dumps({
+                    "verdict": "confirmed", "confidence": 0.9,
+                    "reason": f"{model} checked it", "exploit_path": "",
+                    "corrected_severity": "High", "corrected_issue": "",
+                }),
+                model=model, prompt_tokens=5, completion_tokens=5,
+            )
+        return super().complete(prompt, model, system, timeout, max_tokens,
+                                temperature)
+
+
+def _finding(uid="f1"):
+    return {
+        "uid": uid, "Issue": "Reentrancy in withdraw", "Severity": "High",
+        "Description": "x", "Impact": "y", "Location": "Vault.withdraw",
+        "proposer_model": "openai", "confidence": 0.9, "agent": "a",
+    }
+
+
+def test_an_exhausted_judge_fails_over_to_an_equally_independent_one():
+    """A provider running out of daily quota is an outage, not a measurement.
+    Without failover every finding routed to it comes back unjudged."""
+    llm = ExhaustedJudge(dead="gemini")
+    state = {"code_snippet": CONTRACT, "context_brief": ""}
+    # Force the dead judge to be the one picked for this finding.
+    agent = ValidatorAgent(llm, panel_size=1, judge_models=["gemini", "claude"])
+    out = agent.validate(_finding(), state)
+
+    assert out["judged_by"], "finding came back unjudged despite a live judge"
+    assert "gemini" not in out["judged_by"]
+    assert out["independence"] == INDEPENDENCE_CROSS_PROVIDER
+    assert not out.get("unjudged")
+    # The dead judge is still reported -- the failover is visible, not hidden.
+    assert "gemini" in out["judges_failed"]
+    print(f"  falhou em gemini, julgado por {out['judged_by']}")
+
+
+def test_an_exhausted_judge_is_retired_for_the_rest_of_the_run():
+    """Asking a provider that said 'come back in 7 hours' once more per
+    finding is how a run burns an hour producing nothing."""
+    llm = ExhaustedJudge(dead="gemini")
+    state = {"code_snippet": CONTRACT, "context_brief": ""}
+    agent = ValidatorAgent(llm, panel_size=1, judge_models=["gemini", "claude"])
+    for i in range(6):
+        agent.validate(_finding(uid=f"f{i}"), state)
+    dead_calls = llm.calls.count("gemini")
+    assert dead_calls == 1, f"kept calling an exhausted judge {dead_calls} times"
+    assert "gemini" not in agent.judge_pool()
+    print(f"  juiz esgotado chamado {dead_calls}x, depois aposentado")
+
+
+def test_failover_never_trades_independence_for_throughput():
+    """A replacement judge from the proposer's own family would buy a verdict
+    by giving up the one property this architecture exists to establish."""
+    llm = ExhaustedJudge(dead="claude")
+    state = {"code_snippet": CONTRACT, "context_brief": ""}
+    # Only same-family replacements available once 'claude' dies.
+    agent = ValidatorAgent(llm, panel_size=1,
+                           judge_models=["claude", "openai"],
+                           strict_independence=False)
+    out = agent.validate(_finding(), state)
+    assert out["independence"] != INDEPENDENCE_SELF, (
+        "failed over to the proposer itself"
+    )
+    assert out.get("unjudged") or not out["judged_by"], (
+        f"accepted a less independent judge: {out['judged_by']}"
+    )
+    print("  recusou substituto menos independente; achado fica sem julgamento")
+
+
+def test_a_transient_rate_limit_does_not_retire_a_judge():
+    """Per-minute throttling is what the limiter is for. Retiring a judge over
+    a momentary burst would throw away most of the free capacity there is."""
+    from src.agents.validator import _looks_exhausted
+    assert not _looks_exhausted("429 rate limit, retry in 20s")
+    assert not _looks_exhausted("Too Many Requests")
+    assert _looks_exhausted("free_tier_requests exceeded, retry in 7h")
+    assert _looks_exhausted("insufficient_quota: organization_spend_limit_exceeded")
+    print("  taxa transitoria != cota esgotada")
+
 if __name__ == "__main__":
     tests = [v for k, v in sorted(globals().items()) if k.startswith("test_")]
     failed = 0

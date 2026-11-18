@@ -163,6 +163,7 @@ def audit_one(
     max_refine_rounds: int = 1,
     judge_top_n: int = 0,
     judge_models=None,
+    context_prompt: str = "default",
 ) -> Dict[str, Any]:
     from src.agents.graph import build_graph
     from src.agents.llm import LLMClient
@@ -183,6 +184,7 @@ def audit_one(
         strict_independence=not allow_self_validation,
         judge_top_n=judge_top_n,
         judge_models=judge_models,
+        context_prompt=context_prompt,
     )
 
     try:
@@ -239,6 +241,7 @@ def run_new(
     max_refine_rounds: int = 1,
     judge_top_n: int = 0,
     judge_models=None,
+    context_prompt: str = "default",
 ) -> List[Dict[str, Any]]:
     results: List[Dict[str, Any]] = []
     done = 0
@@ -247,7 +250,7 @@ def run_new(
             pool.submit(
                 audit_one, item, model, max_rounds, panel_size,
                 allow_self_validation, max_refine_rounds, judge_top_n,
-                judge_models,
+                judge_models, context_prompt,
             ): item
             for item in dataset
         }
@@ -371,11 +374,25 @@ def main() -> int:
                          "output says so.")
     ap.add_argument("--judge-top-n", type=int, default=0,
                     help="judge only the N most confident findings per "
-                         "contract (0 = judge all). Top-1/Top-5/MRR depend "
-                         "only on the head of the ranking, so a verdict on "
-                         "the 18th finding cannot move a metric; this roughly "
-                         "halves judge calls and fits a free-tier quota. "
+                         "contract (0 = judge all, and that is what you want "
+                         "for a reported number). This is a COST control, not "
+                         "a free one. It was introduced with the rationale "
+                         "that a verdict on the 18th finding cannot move a "
+                         "metric, and that rationale is wrong: judging is what "
+                         "decides the rank, so a capped finding can never "
+                         "climb. Measured at N=8: 49%% of the labelled "
+                         "vulnerabilities that ended up mis-ranked were never "
+                         "judged, against 6%% of those that reached rank 1. "
                          "Deferred findings are flagged in the output.")
+    ap.add_argument("--context-prompt", default="default",
+                    choices=("default", "seed", "evolved"),
+                    help="which instruction the context node uses. 'default' "
+                         "is this architecture's own briefing. 'seed' and "
+                         "'evolved' are the published prompt optimiser's "
+                         "input and output -- the two arms of the "
+                         "prompt-optimisation ablation. That optimiser touches "
+                         "only this prompt, so these three are the whole "
+                         "space of the experiment.")
     ap.add_argument("--allow-self-validation", action="store_true",
                     help="permit a model to judge its own findings when no "
                          "independent judge is configured. Biases confidence "
@@ -414,7 +431,7 @@ def main() -> int:
     results = run_new(
         subset, args.model, args.workers, args.max_rounds,
         args.panel_size, args.allow_self_validation, args.max_refine_rounds,
-        args.judge_top_n, args.judge,
+        args.judge_top_n, args.judge, args.context_prompt,
     )
 
     ok = [r for r in results if not r.get("error")]

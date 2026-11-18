@@ -55,6 +55,7 @@ def build_graph(
     panel_size: int = 1,
     strict_independence: bool = False,
     judge_top_n: int = 0,
+    context_prompt: str = "default",
 ):
     """Compile the audit graph.
 
@@ -81,11 +82,16 @@ def build_graph(
         strict_independence: raise rather than fall back to self-validation
             when no independent judge is configured. Turn this on for runs
             whose numbers you intend to report.
+        context_prompt: which instruction the context node uses --
+            ``default`` (this architecture's own briefing), ``seed`` (the
+            paper's prompt optimiser before it ran) or ``evolved`` (after).
+            This is the knob the prompt-optimisation ablation turns; it is the
+            only prompt the published optimiser touches.
     """
     client = client or LLMClient(strict=strict)
     specialties = specialties or DEFAULT_SPECIALTIES
 
-    context_agent = ContextAgent(client, model)
+    context_agent = ContextAgent(client, model, prompt_variant=context_prompt)
     planner = PlannerAgent(
         client, model, available=specialties, always_dispatch=always_dispatch
     )

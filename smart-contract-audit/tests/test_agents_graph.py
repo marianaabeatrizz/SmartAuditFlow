@@ -295,6 +295,45 @@ def test_rank_score_ordering_properties():
     assert rank_score(confirmed) > rank_score(uncertain) > rank_score(rejected)
 
 
+
+def test_prompt_optimisation_ablation_changes_only_the_instruction():
+    """The published optimiser touches exactly one prompt: the contract
+    analysis one. Swapping variants must change that instruction and nothing
+    else, or the ablation is measuring more than the prompt."""
+    from src.agents.orchestrator import (
+        CONTEXT_PROMPT_EVOLVED, CONTEXT_PROMPT_SEED, ContextAgent,
+    )
+    code = "contract C { function f() public {} }"
+    built = {}
+    for variant in ("default", "seed", "evolved"):
+        agent = ContextAgent.__new__(ContextAgent)
+        agent.prompt_variant = variant
+        built[variant] = agent.build_prompt(code)
+
+    assert CONTEXT_PROMPT_SEED in built["seed"]
+    assert CONTEXT_PROMPT_EVOLVED in built["evolved"]
+    assert CONTEXT_PROMPT_SEED not in built["evolved"]
+    assert CONTEXT_PROMPT_EVOLVED not in built["seed"]
+    # Every arm must see the same contract, or it is not an ablation.
+    for prompt in built.values():
+        assert code in prompt
+    assert len({built["default"], built["seed"], built["evolved"]}) == 3
+    print("  3 variantes distintas, mesmo contrato em todas")
+
+
+def test_unknown_prompt_variant_is_refused():
+    """A typo in the ablation flag must fail loudly, not silently fall back to
+    the default and report the wrong arm as measured."""
+    from src.agents.llm import LLMClient
+    from src.agents.orchestrator import ContextAgent
+    try:
+        ContextAgent(LLMClient(strict=False), None, prompt_variant="optimised")
+    except ValueError as exc:
+        assert "optimised" in str(exc)
+        print("  variante desconhecida rejeitada")
+        return
+    raise AssertionError("a bogus prompt variant was silently accepted")
+
 if __name__ == "__main__":
     tests = [v for k, v in sorted(globals().items()) if k.startswith("test_")]
     failed = 0

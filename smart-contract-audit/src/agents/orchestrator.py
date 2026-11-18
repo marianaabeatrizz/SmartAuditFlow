@@ -19,16 +19,63 @@ from src.agents.state import Task
 logger = logging.getLogger(__name__)
 
 
+# --------------------------------------------------------------------------
+# Prompt variants for the prompt-optimisation ablation.
+#
+# The published ``promptOptimization/`` module evolves exactly one prompt: the
+# one that reads a contract and extracts its structure (functions, state
+# variables, modifiers, events). In this architecture that is the context
+# briefing, so this node is where "with and without prompt optimisation" can
+# be measured end to end.
+#
+# Both strings below are verbatim from the published artifact:
+#   SEED     -- promptOptimization/apps/config.py, seed_prompts[0]
+#   EVOLVED  -- promptOptimization/result/history.json, best of generation 4
+#
+# Worth knowing before reading the result: the published evolution run reports
+# best fitness falling every generation (0.565 -> 0.345 -> 0.315 -> 0.265) and
+# population diversity collapsing to 0.009, on a training set of two synthetic
+# toy contracts. The "optimised" prompt is a shorter, vaguer paraphrase of its
+# own seed. So this ablation is a test of whether that optimiser helped, not an
+# assumption that it did.
+CONTEXT_PROMPT_SEED = (
+    "Analyze the provided smart contract. Focus on its function definitions, "
+    "state variables, modifiers, and events. Be precise."
+)
+CONTEXT_PROMPT_EVOLVED = (
+    "inspect the provided smart contract. Highlight functions, variables, "
+    "modifiers, and events. Be precise."
+)
+CONTEXT_PROMPT_VARIANTS = ("default", "seed", "evolved")
+
+
 class ContextAgent(Agent):
     """Produces the shared brief every specialist is grounded on.
 
     Running this once and handing the result to all specialists is much cheaper
     than making each of twelve agents independently work out what the contract
     does, and it stops them disagreeing about basic facts.
+
+    ``prompt_variant`` selects which instruction the node uses. ``default`` is
+    this architecture's own briefing; ``seed`` and ``evolved`` are the before
+    and after of the paper's prompt optimiser, for the ablation. Only the task
+    instruction changes between variants -- same model, same system prompt,
+    same token budget -- so a difference in the result is attributable to the
+    prompt and to nothing else.
     """
 
     role = "orchestrator"
     name = "orchestrator:context"
+
+    def __init__(self, client: LLMClient, model: Optional[str] = None,
+                 prompt_variant: str = "default"):
+        super().__init__(client, model)
+        if prompt_variant not in CONTEXT_PROMPT_VARIANTS:
+            raise ValueError(
+                f"unknown context prompt variant {prompt_variant!r}; "
+                f"expected one of {CONTEXT_PROMPT_VARIANTS}"
+            )
+        self.prompt_variant = prompt_variant
 
     @property
     def system_prompt(self) -> str:
@@ -38,17 +85,28 @@ class ContextAgent(Agent):
             "factual; you do not speculate about vulnerabilities here."
         )
 
-    def run(self, state: Dict[str, Any]) -> Dict[str, Any]:
-        code = state.get("code_snippet", "")
-        static_tool = state.get("static_tool", "")
-
-        prompt = f"""Read this contract and write a briefing for the audit team.
+    def build_prompt(self, code: str, static_tool: str = "") -> str:
+        """The instruction sent to the model, per variant."""
+        tool_block = (
+            f"Static analyzer output:{chr(10)}{static_tool}{chr(10)}"
+            if static_tool else ""
+        )
+        if self.prompt_variant != "default":
+            instruction = (CONTEXT_PROMPT_SEED if self.prompt_variant == "seed"
+                           else CONTEXT_PROMPT_EVOLVED)
+            return f"""{instruction}
 
 ```solidity
 {code}
 ```
-{f"Static analyzer output:{chr(10)}{static_tool}{chr(10)}" if static_tool else ""}
-Cover, concisely:
+{tool_block}"""
+
+        return f"""Read this contract and write a briefing for the audit team.
+
+```solidity
+{code}
+```
+{tool_block}Cover, concisely:
 
 1. **Purpose** - what the contract does, and which standards it implements.
 2. **Solidity version** - state it exactly. It decides whether arithmetic wraps.
@@ -59,6 +117,12 @@ Cover, concisely:
 
 Be factual and specific. Name functions. Under 400 words. No vulnerability
 analysis - that is the specialists' job."""
+
+    def run(self, state: Dict[str, Any]) -> Dict[str, Any]:
+        code = state.get("code_snippet", "")
+        static_tool = state.get("static_tool", "")
+
+        prompt = self.build_prompt(code, static_tool)
 
         try:
             response = self.ask(prompt, max_tokens=1200)
