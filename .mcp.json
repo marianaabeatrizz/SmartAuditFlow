@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "drawio": {
+      "command": "./smart-contract-audit/.venv/Scripts/python.exe",
+      "args": ["./tools/drawio-mcp/server.py"],
+      "env": {
+        "PYTHONUTF8": "1",
+        "PYTHONIOENCODING": "utf-8"
+      }
+    }
+  }
+}

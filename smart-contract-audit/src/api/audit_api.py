@@ -5,6 +5,7 @@ import time
 from datetime import datetime
 from flask import Blueprint, request, jsonify
 from src.storage.memory import storage
+from src.agents.engine import MultiAgentEngine
 from src.workflow.engine import WorkflowEngine
 from src.workflow.models import ModelManager
 
@@ -14,6 +15,22 @@ audit_api = Blueprint('audit', __name__)
 # Global model manager (shared across requests)
 global_model_manager = None
 active_threads = {}
+
+# The progress UI is driven by these. The multi-agent graph is not a
+# fixed-length pipeline, so its entries are phases reached rather than a count
+# of nodes -- the specialist phase alone covers a dozen concurrent agents.
+# Must stay in sync with src/agents/engine.py:PHASES.
+STEP_NAMES = {
+    'legacy': [
+        'Initial Analysis', 'Audit Plan', 'Parameter Extractor',
+        'Iteration', 'Format Converter',
+    ],
+    'multi-agent': [
+        'Context Briefing', 'Planning & Delegation', 'Specialist Audit',
+        'Adversarial Validation', 'Refinement', 'Coverage Review',
+        'Ranking & Report',
+    ],
+}
 
 logger = logging.getLogger(__name__)
 
@@ -37,14 +54,31 @@ def start_audit():
         code_snippet = data.get('code_snippet', '').strip()
         static_tool = data.get('static_tool', '').strip()
         model_choice = data.get('model', 'auto') # FIX: Match frontend key 'model'
-        
+        # 'multi-agent' is the current architecture; 'legacy' still runs the
+        # original linear five-node pipeline so the two can be compared.
+        architecture = data.get('architecture', 'multi-agent')
+        max_rounds = int(data.get('max_rounds', 2))
+        # Inner loop: a finding that fails verification goes back to the
+        # specialist that proposed it. 0 disables it.
+        max_refine_rounds = int(data.get('max_refine_rounds', 1))
+
         if not code_snippet:
             return jsonify({'error': 'code_snippet is required'}), 400
+        if architecture not in ('multi-agent', 'legacy'):
+            return jsonify({
+                'error': f"unknown architecture '{architecture}'; "
+                         "expected 'multi-agent' or 'legacy'"
+            }), 400
         
         print(f"🚀 Starting audit session with model: {model_choice}")
         
         # Create session
         session_id = storage.create_session(code_snippet, static_tool, model_choice)
+        # Record which engine ran it, so the status endpoint reports the right
+        # phases and results stay attributable after the fact.
+        session = storage.get_session(session_id)
+        if session:
+            session['architecture'] = architecture
         
         # This is the background task that runs the audit
         def run_workflow():
@@ -52,11 +86,22 @@ def start_audit():
                 print(f"🔄 Thread started for session {session_id}")
                 storage.update_session_status(session_id, 'running')
                 
-                model_manager = get_model_manager()
-                model_manager.set_preferred_model(model_choice)
-                
-                print(f"🏗️ Creating workflow engine...")
-                engine = WorkflowEngine(session_id, model_choice)
+                print(f"🏗️ Creating {architecture} engine...")
+                if architecture == 'multi-agent':
+                    engine = MultiAgentEngine(
+                        session_id,
+                        model_choice,
+                        max_rounds=max_rounds,
+                        max_refine_rounds=max_refine_rounds,
+                    )
+                    print(f"🕸️ {engine.describe()}")
+                else:
+                    # The legacy engine mutates a process-wide singleton, so
+                    # concurrent legacy sessions can still clobber each other's
+                    # model choice. Kept as-is for faithful comparison.
+                    model_manager = get_model_manager()
+                    model_manager.set_preferred_model(model_choice)
+                    engine = WorkflowEngine(session_id, model_choice)
 
                 def progress_updater(step: int, name: str, percentage: int, status: str = 'running'):
                     """Callback to update session progress in storage."""
@@ -101,6 +146,7 @@ def start_audit():
         return jsonify({
             'session_id': session_id,
             'status': 'started',
+            'architecture': architecture,
             'message': 'Audit started successfully'
         }), 201
         
@@ -174,13 +220,18 @@ def get_audit_status(session_id):
                 'current_step_name': current_step_name,
                 'elapsed_time': elapsed_time,
                 'step_details': [
-                    {'step': 1, 'name': 'Initial Analysis', 'status': get_node_status(1, current_step, audit_status)},
-                    {'step': 2, 'name': 'Audit Plan', 'status': get_node_status(2, current_step, audit_status)},
-                    {'step': 3, 'name': 'Parameter Extractor', 'status': get_node_status(3, current_step, audit_status)},
-                    {'step': 4, 'name': 'Iteration', 'status': get_node_status(4, current_step, audit_status)},
-                    {'step': 5, 'name': 'Format Converter', 'status': get_node_status(5, current_step, audit_status)}
+                    {'step': i, 'name': name,
+                     'status': get_node_status(i, current_step, audit_status)}
+                    for i, name in enumerate(
+                        STEP_NAMES.get(
+                            session.get('architecture', 'legacy'),
+                            STEP_NAMES['legacy'],
+                        ),
+                        start=1,
+                    )
                 ]
             },
+            'architecture': session.get('architecture', 'legacy'),
             'created_at': session['created_at'],
             'updated_at': session['updated_at'],
             'model_choice': session.get('model_choice', 'unknown')

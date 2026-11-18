@@ -8,7 +8,7 @@ from flask import Flask, send_from_directory
 from flask_cors import CORS
 from src.api.audit_api import audit_api
 # from src.api.workflow_api import workflow_api # This blueprint appears to be unused/legacy
-from src.routes.user import user_bp
+# from src.routes.user import user_bp # Disabled: DB not configured (requires flask_sqlalchemy)
 from src.api.models_api import models_bp
 
 # Configure logging

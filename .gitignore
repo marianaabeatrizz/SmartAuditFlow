@@ -91,3 +91,5 @@ coverage/
 
 # Documentation
 docs/_build/
+# Cache de respostas de LLM: grande, e guarda prompts com codigo dos contratos
+smart-contract-audit/.llm_cache/

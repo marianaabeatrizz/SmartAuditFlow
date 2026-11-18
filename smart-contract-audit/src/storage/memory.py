@@ -190,6 +190,12 @@ class InMemoryStorage:
         """Validate and ensure findings follow the correct format"""
         validated_findings = []
         
+        # Keys this method owns and normalises; anything else a producer adds
+        # (the multi-agent engine attaches Rank, Confidence, Verdict, Agent...)
+        # is carried through untouched rather than silently dropped.
+        _OWNED = {'Issue', 'issue', 'Severity', 'severity', 'Description',
+                  'description', 'Impact', 'impact', 'Location', 'location'}
+
         for finding in findings:
             if isinstance(finding, dict):
                 # Ensure all required fields exist with correct names and types
@@ -200,6 +206,9 @@ class InMemoryStorage:
                     'Impact': str(finding.get('Impact', finding.get('impact', 'Impact not specified'))),
                     'Location': str(finding.get('Location', finding.get('location', 'Location not specified')))
                 }
+                validated_finding.update(
+                    {k: v for k, v in finding.items() if k not in _OWNED}
+                )
                 
                 # Validate severity values
                 if validated_finding['Severity'] not in ['High', 'Medium', 'Low']:
